@@ -1,88 +1,90 @@
-## Partition Info
+# Partition Info
 
-# Boot Partitions (Both Slots)
-•boot
-•dtbo
-•init_boot
-•vendor_boot
+## Boot Partitions (Both Slots)
+- boot  
+- dtbo  
+- init_boot  
+- vendor_boot  
 
-# VBmeta Partitions (Both Slots)
-•vbmeta
-•vbmeta_system
-•vbmeta_vendor
+## VBmeta Partitions (Both Slots)
+- vbmeta  
+- vbmeta_system  
+- vbmeta_vendor  
 
-# Firmware Partitions (Both Slots)
-•apusys
-•audio_dsp
-•ccu
-•connsys_bt
-•connsys_gnss
-•connsys_wifi
-•dpm
-•gpueb
-•gz
-•lk
-•logo
-•mcupm
-•mcf_ota
-•md1img
-•mvpu_algo
-•pi_img
-•scp
-•spmfw
-•sspm
-•tee
-•vcp
+## Firmware Partitions (Both Slots)
+- apusys  
+- audio_dsp  
+- ccu  
+- connsys_bt  
+- connsys_gnss  
+- connsys_wifi  
+- dpm  
+- gpueb  
+- gz  
+- lk  
+- logo  
+- mcupm  
+- mcf_ota  
+- md1img  
+- mvpu_algo  
+- pi_img  
+- scp  
+- spmfw  
+- sspm  
+- tee  
+- vcp  
 
+---
 
-##Other Important partitions
+# Other Important Partitions  
 
-# Device specific (can't be shared)
-•nvcfg
-•nvram
-•nvdata
-•persist
+## Device Specific (Can't Be Shared)
+- nvcfg  
+- nvram  
+- nvdata  
+- persist  
 
-# Device lock info (contains device password/Google account & OEM unlock status)
-•frp - (encrypted)
+## Device Lock Info  
+*(Contains device password, Google account & OEM unlock status)*  
+- frp *(encrypted)*  
 
-# Preloader (can't be accessible through bootloader)
-•preloader
-•preloader_backup
+## Preloader *(Not Accessible Through Bootloader)*
+- preloader  
+- preloader_backup  
 
-# Dynamic (Recreated after every boot)
-•protect1
-•protect2
-•boot_para
-•dram_para
+## Dynamic *(Recreated After Every Boot)*
+- protect1  
+- protect2  
+- boot_para  
+- dram_para  
 
-# Contains device related stuff (can't be shared)
-•nt_reserve1 - ( contains SKU & Colors )
-•nt_uefi - (encrypted)
+## Contains Device-Related Data *(Can't Be Shared)*
+- nt_reserve1 *(Contains SKU & Colors)*  
+- nt_uefi *(encrypted)*  
 
-# Partition Table(GPT)
-•pgpt
-•sgpt - (backup of pgpt)
+## Partition Table (GPT)
+- pgpt  
+- sgpt *(Backup of pgpt)*  
 
-# Contains Bootloader unlock status (not recommended to flash)
-•seccfg
+## Bootloader Unlock Status *(Not Recommended to Flash)*
+- seccfg  
 
-# Contains Boot mode & info
-misc - ( contains recovery bootloop info )
-•efuse
-•para
+## Boot Mode & Info
+- misc *(Contains recovery bootloop info)*  
+- efuse  
+- para  
 
-# Logs
-•nt_kmsg
-•flashinfo - ( contains last flash info )
-•expdb - (contains boot error)
+## Logs
+- nt_kmsg  
+- flashinfo *(Contains last flash info)*  
+- expdb *(Contains boot error logs)*  
 
-# it's blank ( unused )
-•pstore
-•otp
-•proinfo
-•nt_reserve2
-•sec1
+## Unused / Blank Partitions
+- pstore  
+- otp  
+- proinfo  
+- nt_reserve2  
+- sec1  
 
-#Unknown
-•nt_log - (encrypted)
+## Unknown Partitions
+- nt_log *(encrypted)*
