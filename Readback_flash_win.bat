@@ -39,6 +39,8 @@ cd /d "%WORK_DIR%" 2>nul || (
 :: PLATFORM TOOLS DETECTION
 :: ------------------------
 set "fastboot=platform-tools-latest\platform-tools\fastboot.exe"
+set "adb=platform-tools-latest\platform-tools\adb.exe"
+
 if not exist "%fastboot%" (
     echo 🔍 Platform-tools not found! Downloading...
     echo 🔍 Platform-tools not found! Downloading... >> "%LOG_FILE%"
@@ -58,54 +60,71 @@ if not exist "%fastboot%" (
 )
 
 :: ------------------------
-:: DEVICE PRE-CHECKS
+:: DEVICE MODE DETECTION
 :: ------------------------
-echo.
-echo 📌 Checking Requirements...
-echo 📌 Checking Requirements... >> "%LOG_FILE%"
+echo 🔍 Detecting device mode...
+echo 🔍 Detecting device mode... >> "%LOG_FILE%"
 
-:: Bootloader Check
-choice /m "Is your device bootloader unlocked?"
-if %errorlevel% equ 2 (
-    echo ❌ Bootloader must be unlocked to proceed.
-    echo ❌ Bootloader must be unlocked to proceed. >> "%LOG_FILE%"
-    pause
-    exit /b 1
+:: Check if in ADB mode
+%adb% get-state 2>nul | find "device" >nul
+if %errorlevel% equ 0 (
+    echo 🔄 Device in ADB mode, rebooting to bootloader...
+    echo 🔄 Device in ADB mode, rebooting to bootloader... >> "%LOG_FILE%"
+    %adb% reboot bootloader
+    timeout /t 5 >nul
 )
 
-:: Fastboot Mode Check
-choice /m "Is your device in bootloader mode?"
-if %errorlevel% equ 2 (
-    echo ❌ Device must be in bootloader mode.
-    echo ❌ Device must be in bootloader mode. >> "%LOG_FILE%"
-    pause
-    exit /b 1
-)
-
-:: Fastboot Driver Check
-choice /m "Are fastboot drivers installed?"
-if %errorlevel% equ 2 (
-    echo ❌ Install Google USB Drivers from:
-    echo 🔗 https://developer.android.com/studio/run/win-usb
-    echo ❌ Fastboot drivers missing! >> "%LOG_FILE%"
-    pause
-    exit /b 1
-)
-
-:: Check Fastboot Device
+:: Check if in Fastboot mode
 for /f "tokens=1" %%A in ('%fastboot% devices 2^>nul') do (
     set "DEVICE_ID=%%A"
 )
+
 if not defined DEVICE_ID (
-    echo ❌ No fastboot device detected!
-    echo ❌ No fastboot device detected! >> "%LOG_FILE%"
-    echo 🔍 Make sure the device is connected and in bootloader mode.
+    echo ❌ No device detected in Fastboot mode!
+    echo ❌ No device detected in Fastboot mode! >> "%LOG_FILE%"
     pause
     exit /b 1
 )
 
 echo ✅ Device detected: %DEVICE_ID%
 echo ✅ Device detected: %DEVICE_ID% >> "%LOG_FILE%"
+
+:: Check if in Fastbootd
+%fastboot% getvar is-userspace 2>&1 | find "yes" >nul
+if %errorlevel% equ 0 (
+    echo 🔄 Device is in Fastbootd mode, rebooting to bootloader...
+    echo 🔄 Device is in Fastbootd mode, rebooting to bootloader... >> "%LOG_FILE%"
+    %fastboot% reboot bootloader
+    timeout /t 5 >nul
+)
+
+:: ------------------------
+:: BOOTLOADER UNLOCK CHECK
+:: ------------------------
+echo 🔍 Checking bootloader unlock status...
+echo 🔍 Checking bootloader unlock status... >> "%LOG_FILE%"
+
+%fastboot% getvar unlocked 2>&1 | find "unlocked: no" >nul
+if %errorlevel% equ 0 (
+    echo ❌ Bootloader is locked! Please unlock it before proceeding.
+    echo ❌ Bootloader is locked! Please unlock it before proceeding. >> "%LOG_FILE%"
+    pause
+    exit /b 1
+)
+
+echo ✅ Bootloader is unlocked!
+echo ✅ Bootloader is unlocked! >> "%LOG_FILE%"
+timeout /t 1 >nul
+
+:: ------------------------
+:: DEVICE FORMAT (ERASE USERDATA & METADATA)
+:: ------------------------
+echo ⚠️ Formatting device (Erasing userdata & metadata)...
+echo ⚠️ Formatting device (Erasing userdata & metadata)... >> "%LOG_FILE%"
+%fastboot% erase metadata >> "%LOG_FILE%" 2>&1
+%fastboot% erase userdata >> "%LOG_FILE%" 2>&1
+echo ✅ Format complete! Device is clean.
+echo ✅ Format complete! Device is clean. >> "%LOG_FILE%"
 timeout /t 1 >nul
 
 :: ------------------------
@@ -159,24 +178,11 @@ timeout /t 1 >nul
 :: FINALIZATION
 :: ------------------------
 echo 🔄 Setting Active Slot A...
-echo 🔄 Setting Active Slot A... >> "%LOG_FILE%"
 %fastboot% --set-active=a >> "%LOG_FILE%" 2>&1
 echo ✅ Slot A set as active!
-echo ✅ Slot A set as active! >> "%LOG_FILE%"
 
 echo 🔄 Rebooting Device...
-echo 🔄 Rebooting Device... >> "%LOG_FILE%"
 %fastboot% reboot >> "%LOG_FILE%" 2>&1
 echo ✅ Rebooting to System!
-echo ✅ Rebooting to System! >> "%LOG_FILE%"
-
-:: COMPLETION MESSAGE
-cls
-echo =============================================
-echo   ✅ FASTBOOT READBACK FLASHING SUCCESSFUL!  
-echo =============================================
-echo 🎉 Your Nothing Phone 2a is now running the stock firmware.
-echo ℹ️ Log file saved to flash_log.txt for reference.
-echo ℹ️ You may now safely disconnect your device.
 pause
 exit
