@@ -88,3 +88,7 @@
 
 ## Unknown Partitions
 - nt_log *(encrypted)*
+
+## Device Data
+- userdata
+- metadata
