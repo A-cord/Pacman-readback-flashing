@@ -35,22 +35,23 @@
 - vcp  
 
 ## Logical Partition
-super
-├── odm
-├── odm_dlkm
-├── product
-├── system
-├── system_dlkm
-├── system_ext
-├── vendor
-├── vendor_dlkm
-├── odm_cow
-├── odm_dlkm_cow
-├── product_cow
-├── system_cow
-├── system_dlkm_cow
-├── system_ext_cow
-├── vendor_cow
+super  
+├── odm  
+├── odm_dlkm  
+├── product  
+├── system  
+├── system_dlkm  
+├── system_ext  
+├── vendor  
+├── vendor_dlkm  
+
+├── odm_cow  
+├── odm_dlkm_cow  
+├── product_cow  
+├── system_cow  
+├── system_dlkm_cow  
+├── system_ext_cow  
+├── vendor_cow  
 └── vendor_dlkm_cow
 
 ---
