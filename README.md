@@ -1,6 +1,6 @@
 ## Partition Info
 
-#Boot Partitions (Both Slots)
+# Boot Partitions (Both Slots)
 •boot
 •dtbo
 •init_boot
