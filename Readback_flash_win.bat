@@ -1,164 +1,358 @@
 @echo off
-title FASTBOOT READBACK FLASHING
-setlocal EnableDelayedExpansion
+title Fastboot Readback Flashing
+chcp 65001 >nul 2>&1
 
-:: -----------------------------
-:: LOGGING SETUP
-:: -----------------------------
-set LOG_FILE=%CD%\flash_log.txt
-echo ====== Flashing Log Started at %DATE% %TIME% ====== > "%LOG_FILE%"
 
-:: -----------------------------
-:: CHECK & DOWNLOAD PLATFORM-TOOLS
-:: -----------------------------
-if not exist "platform-tools\fastboot.exe" (
-    echo [INFO] Platform tools not found. Downloading...
-    curl -o platform-tools.zip https://dl.google.com/android/repository/platform-tools-latest-windows.zip
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to download platform-tools!
-        pause
-        exit /b 1
-    )
-    echo [INFO] Extracting platform-tools...
-    powershell -Command "Expand-Archive -Path 'platform-tools.zip' -DestinationPath '.' -Force"
-    del platform-tools.zip
-)
+:: Initialize log file
+set "LOG_FILE=%~dp0flash_log.txt"
+echo ============================================= > "%LOG_FILE%"
+echo   FASTBOOT READBACK FLASHING LOG             >> "%LOG_FILE%"
+echo ============================================= >> "%LOG_FILE%"
+echo Started: %DATE% %TIME%                        >> "%LOG_FILE%"
+echo.                                             >> "%LOG_FILE%"
 
-set PATH=%CD%\platform-tools;%PATH%
-
-:: -----------------------------
-:: ASCII HEADER
-:: -----------------------------
-echo =====================================================
-echo =          FASTBOOT READBACK FLASHING               =
-echo =              Nothing Phone 2a                     =
-echo =====================================================
+:: Clear screen & show banner
+cls
+echo =============================================
+echo   FASTBOOT READBACK FLASHING SCRIPT         
+echo =============================================
+echo   Checking Environment...
 echo.
 
-:: -----------------------------
-:: CHECK DEVICE MODE & BOOTLOADER STATUS
-:: -----------------------------
-:DetectMode
-echo [INFO] Detecting device mode...
-adb get-state >nul 2>&1
+:: Set working directory
+set "WORK_DIR=%~dp0"
+cd /d "%WORK_DIR%" 2>nul || (
+    echo [ERROR] Failed to set working directory!
+    echo [ERROR] Failed to set working directory! >> "%LOG_FILE%"
+    pause
+    exit /b 1
+)
+
+:: ------------------------
+:: PLATFORM TOOLS DETECTION
+:: ------------------------
+set "fastboot=platform-tools-latest\platform-tools\fastboot.exe"
+set "adb=platform-tools-latest\platform-tools\adb.exe"
+
+if not exist "%fastboot%" (
+    echo Platform-tools not found! Downloading...
+    echo Platform-tools not found! Downloading... >> "%LOG_FILE%"
+    curl --ssl-no-revoke -L https://dl.google.com/android/repository/platform-tools-latest-windows.zip -o platform-tools.zip >> "%LOG_FILE%" 2>&1
+    if exist platform-tools.zip (
+        echo Platform-tools downloaded. Extracting...
+        powershell -Command "Expand-Archive -Path 'platform-tools.zip' -DestinationPath 'platform-tools-latest' -Force" >> "%LOG_FILE%" 2>&1
+        del /f /q platform-tools.zip
+    ) else (
+        echo [ERROR] Failed to download platform-tools!
+        echo [ERROR] Failed to download platform-tools! >> "%LOG_FILE%"
+        exit /b 1
+    )
+) else (
+    echo Platform-tools detected. Proceeding...
+    echo Platform-tools detected. Proceeding... >> "%LOG_FILE%"
+)
+
+:: ------------------------
+:: DEVICE MODE DETECTION
+:: ------------------------
+echo Detecting device mode...
+echo Detecting device mode... >> "%LOG_FILE%"
+
+:: Check if in ADB mode
+%adb% get-state 2>nul | find "device" >nul
 if %errorlevel% equ 0 (
-    echo [INFO] Device in ADB mode, rebooting to bootloader...
-    adb reboot bootloader
-    timeout /t 8 >nul
-    goto DetectMode
+    echo Device in ADB mode, rebooting to bootloader...
+    echo Device in ADB mode, rebooting to bootloader... >> "%LOG_FILE%"
+    %adb% reboot bootloader
+    timeout /t 5 >nul
 )
 
-fastboot getvar current-slot >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] No device detected in fastboot mode! Ensure it's connected.
+:: Check if in Fastboot mode
+for /f "tokens=1" %%A in ('%fastboot% devices 2^>nul') do (
+    set "DEVICE_ID=%%A"
+)
+
+if not defined DEVICE_ID (
+    echo [ERROR] No device detected in Fastboot mode!
+    echo [ERROR] No device detected in Fastboot mode! >> "%LOG_FILE%"
     pause
     exit /b 1
 )
 
-fastboot flashing get_unlock_ability >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Bootloader is locked! Unlock before proceeding.
+echo Device detected: %DEVICE_ID%
+echo Device detected: %DEVICE_ID% >> "%LOG_FILE%"
+
+:: Check if in Fastbootd
+%fastboot% getvar is-userspace 2>&1 | find "yes" >nul
+if %errorlevel% equ 0 (
+    echo Device is in Fastbootd mode, rebooting to bootloader...
+    echo Device is in Fastbootd mode, rebooting to bootloader... >> "%LOG_FILE%"
+    %fastboot% reboot bootloader
+    timeout /t 5 >nul
+)
+
+:: ------------------------
+:: BOOTLOADER UNLOCK CHECK
+:: ------------------------
+echo Checking bootloader unlock status...
+echo Checking bootloader unlock status... >> "%LOG_FILE%"
+
+%fastboot% getvar unlocked 2>&1 | find "unlocked: no" >nul
+if %errorlevel% equ 0 (
+    echo [ERROR] Bootloader is locked! Please unlock it before proceeding.
+    echo [ERROR] Bootloader is locked! Please unlock it before proceeding. >> "%LOG_FILE%"
     pause
     exit /b 1
 )
 
-echo [INFO] Device in fastboot mode and bootloader is unlocked.
+echo Bootloader is unlocked!
+echo Bootloader is unlocked! >> "%LOG_FILE%"
+timeout /t 1 >nul
 
-:: -----------------------------
-:: FORMAT DEVICE (ERASE USERDATA & METADATA)
-:: -----------------------------
-echo =====================================================
-echo =                 FORMATTING DEVICE                  =
-echo =====================================================
-fastboot erase userdata
-fastboot erase metadata
-if %errorlevel% neq 0 (
-    echo [ERROR] Formatting failed!
-    pause
-    exit /b 1
-)
-echo [SUCCESS] Data & Metadata erased.
+:: ------------------------
+:: DEVICE FORMAT (ERASE USERDATA & METADATA)
+:: ------------------------
+echo Formatting device (Erasing userdata & metadata)...
+echo Formatting device (Erasing userdata & metadata)... >> "%LOG_FILE%"
+%fastboot% erase metadata >> "%LOG_FILE%" 2>&1
+%fastboot% erase userdata >> "%LOG_FILE%" 2>&1
+echo Format complete! Device is clean.
+echo Format complete! Device is clean. >> "%LOG_FILE%"
+timeout /t 1 >nul
 
-:: -----------------------------
-:: FLASHING PARTITIONS WITH ANIMATION
-:: -----------------------------
-set "spinChars=[ -  ][ \  ][ |  ][ /  ]"
-set /a spin=0
+:: ------------------------
+:: FLASHING PROCESS START
+:: ------------------------
+cls
+echo =============================================
+echo   FLASHING STOCK FASTBOOT ROM  
+echo =============================================
+echo Flashing Stock Fastboot ROM... >> "%LOG_FILE%"
 
-:FlashLoop
+:: Flashing Boot Partitions (A & B)
+echo Flashing Boot Partitions...
+echo Flashing Boot Partitions... >> "%LOG_FILE%"
 for %%p in (boot dtbo init_boot vendor_boot vbmeta vbmeta_system vbmeta_vendor) do (
-    for %%s in (a b) do (
-        set /a spin=0
-        call :AnimatedText "Flashing %%p_%%s..."
-        fastboot flash %%p_%%s %%p_%%s.img > nul 2>&1 
-        if %errorlevel% neq 0 (
-            echo [ERROR] Failed to flash %%p_%%s!
-            pause
-            exit /b 1
-        )
-        echo [SUCCESS] %%p_%%s flashed!
-    )
+    echo Flashing %%p_a...
+    echo Flashing %%p_a... >> "%LOG_FILE%"
+    %fastboot% flash %%p_a %%p_a.img >> "%LOG_FILE%" 2>&1
+    echo Flashing %%p_b...
+    echo Flashing %%p_b... >> "%LOG_FILE%"
+    %fastboot% flash %%p_b %%p_b.img >> "%LOG_FILE%" 2>&1
 )
+echo Boot partitions flashed!
+echo Boot partitions flashed! >> "%LOG_FILE%"
+timeout /t 1 >nul
 
+:: Flashing Firmware (A & B)
+echo Flashing Firmware...
+echo Flashing Firmware... >> "%LOG_FILE%"
 for %%p in (apusys audio_dsp ccu connsys_bt connsys_gnss connsys_wifi dpm gpueb gz lk logo mcupm mcf_ota md1img mvpu_algo pi_img scp spmfw sspm tee vcp) do (
-    for %%s in (a b) do (
-        set /a spin=0
-        call :AnimatedText "Flashing %%p_%%s..."
-        fastboot flash %%p_%%s %%p_%%s.img > nul 2>&1 
-        if %errorlevel% neq 0 (
-            echo [ERROR] Failed to flash %%p_%%s!
-            pause
-            exit /b 1
-        )
-        echo [SUCCESS] %%p_%%s flashed!
-    )
+    echo Flashing %%p_a...
+    echo Flashing %%p_a... >> "%LOG_FILE%"
+    %fastboot% flash %%p_a %%p_a.img >> "%LOG_FILE%" 2>&1
+    echo Flashing %%p_b...
+    echo Flashing %%p_b... >> "%LOG_FILE%"
+    %fastboot% flash %%p_b %%p_b.img >> "%LOG_FILE%" 2>&1
 )
+echo Firmware flashed!
+echo Firmware flashed! >> "%LOG_FILE%"
+timeout /t 1 >nul
 
-echo =====================================================
-echo =             FLASHING SUPER PARTITION             =
-echo =====================================================
-call :AnimatedText "Flashing super.img..."
-fastboot flash super super.img > nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to flash super.img!
-    pause
-    exit /b 1
-)
-echo [SUCCESS] Super partition flashed.
+:: Flashing Logical Partitions
+echo Flashing Super Partition...
+echo Flashing Super Partition... >> "%LOG_FILE%"
+%fastboot% flash super super.img >> "%LOG_FILE%" 2>&1
+echo Super partition flashed!
+echo Super partition flashed! >> "%LOG_FILE%"
+timeout /t 1 >nul
 
-:: -----------------------------
-:: REBOOT DEVICE
-:: -----------------------------
-echo =====================================================
-echo =                REBOOTING DEVICE                   =
-echo =====================================================
-fastboot reboot
-if %errorlevel% neq 0 (
-    echo [ERROR] Reboot failed!
-    pause
-    exit /b 1
-)
-echo [SUCCESS] Device rebooted successfully.
+:: ------------------------
+:: FINALIZATION
+:: ------------------------
+echo Setting Active Slot A...
+%fastboot% --set-active=a >> "%LOG_FILE%" 2>&1
+echo Slot A set as active!
 
-echo =====================================================
-echo =              FLASHING COMPLETE!                   =
-echo =       Log saved to flash_log.txt                  =
-echo =====================================================
-
+echo Rebooting Device...
+%fastboot% reboot >> "%LOG_FILE%" 2>&1
+echo Rebooting to System!
 pause
-exit /b
+exit
 
-:: -----------------------------
-:: ANIMATED TEXT FUNCTION
-:: -----------------------------
-:AnimatedText
-setlocal
-set "message=%~1"
-set /a spin=0
-for /L %%i in (1,1,5) do (
-    set /p=!message! !spinChars:~%spin%,7%! <nul
-    set /a spin=(spin+1)%%4
-    timeout /t 1 >nul
-    echo.
+:: Initialize log file
+set "LOG_FILE=%~dp0flash_log.txt"
+echo ============================================= > "%LOG_FILE%"
+echo   FASTBOOT READBACK FLASHING LOG             >> "%LOG_FILE%"
+echo ============================================= >> "%LOG_FILE%"
+echo Started: %DATE% %TIME%                        >> "%LOG_FILE%"
+echo.                                             >> "%LOG_FILE%"
+
+:: Clear screen & show banner
+cls
+echo =============================================
+echo   FASTBOOT READBACK FLASHING SCRIPT         
+echo =============================================
+echo   Checking Environment...
+echo.
+
+:: Set working directory
+set "WORK_DIR=%~dp0"
+cd /d "%WORK_DIR%" 2>nul || (
+    echo [ERROR] Failed to set working directory!
+    echo [ERROR] Failed to set working directory! >> "%LOG_FILE%"
+    pause
+    exit /b 1
 )
-exit /b
+
+:: ------------------------
+:: PLATFORM TOOLS DETECTION
+:: ------------------------
+set "fastboot=platform-tools-latest\platform-tools\fastboot.exe"
+set "adb=platform-tools-latest\platform-tools\adb.exe"
+
+if not exist "%fastboot%" (
+    echo Platform-tools not found! Downloading...
+    echo Platform-tools not found! Downloading... >> "%LOG_FILE%"
+    curl --ssl-no-revoke -L https://dl.google.com/android/repository/platform-tools-latest-windows.zip -o platform-tools.zip >> "%LOG_FILE%" 2>&1
+    if exist platform-tools.zip (
+        echo Platform-tools downloaded. Extracting...
+        powershell -Command "Expand-Archive -Path 'platform-tools.zip' -DestinationPath 'platform-tools-latest' -Force" >> "%LOG_FILE%" 2>&1
+        del /f /q platform-tools.zip
+    ) else (
+        echo [ERROR] Failed to download platform-tools!
+        echo [ERROR] Failed to download platform-tools! >> "%LOG_FILE%"
+        exit /b 1
+    )
+) else (
+    echo Platform-tools detected. Proceeding...
+    echo Platform-tools detected. Proceeding... >> "%LOG_FILE%"
+)
+
+:: ------------------------
+:: DEVICE MODE DETECTION
+:: ------------------------
+echo Detecting device mode...
+echo Detecting device mode... >> "%LOG_FILE%"
+
+:: Check if in ADB mode
+%adb% get-state 2>nul | find "device" >nul
+if %errorlevel% equ 0 (
+    echo Device in ADB mode, rebooting to bootloader...
+    echo Device in ADB mode, rebooting to bootloader... >> "%LOG_FILE%"
+    %adb% reboot bootloader
+    timeout /t 5 >nul
+)
+
+:: Check if in Fastboot mode
+for /f "tokens=1" %%A in ('%fastboot% devices 2^>nul') do (
+    set "DEVICE_ID=%%A"
+)
+
+if not defined DEVICE_ID (
+    echo [ERROR] No device detected in Fastboot mode!
+    echo [ERROR] No device detected in Fastboot mode! >> "%LOG_FILE%"
+    pause
+    exit /b 1
+)
+
+echo Device detected: %DEVICE_ID%
+echo Device detected: %DEVICE_ID% >> "%LOG_FILE%"
+
+:: Check if in Fastbootd
+%fastboot% getvar is-userspace 2>&1 | find "yes" >nul
+if %errorlevel% equ 0 (
+    echo Device is in Fastbootd mode, rebooting to bootloader...
+    echo Device is in Fastbootd mode, rebooting to bootloader... >> "%LOG_FILE%"
+    %fastboot% reboot bootloader
+    timeout /t 5 >nul
+)
+
+:: ------------------------
+:: BOOTLOADER UNLOCK CHECK
+:: ------------------------
+echo Checking bootloader unlock status...
+echo Checking bootloader unlock status... >> "%LOG_FILE%"
+
+%fastboot% getvar unlocked 2>&1 | find "unlocked: no" >nul
+if %errorlevel% equ 0 (
+    echo [ERROR] Bootloader is locked! Please unlock it before proceeding.
+    echo [ERROR] Bootloader is locked! Please unlock it before proceeding. >> "%LOG_FILE%"
+    pause
+    exit /b 1
+)
+
+echo Bootloader is unlocked!
+echo Bootloader is unlocked! >> "%LOG_FILE%"
+timeout /t 1 >nul
+
+:: ------------------------
+:: DEVICE FORMAT (ERASE USERDATA & METADATA)
+:: ------------------------
+echo Formatting device (Erasing userdata & metadata)...
+echo Formatting device (Erasing userdata & metadata)... >> "%LOG_FILE%"
+%fastboot% erase metadata >> "%LOG_FILE%" 2>&1
+%fastboot% erase userdata >> "%LOG_FILE%" 2>&1
+echo Format complete! Device is clean.
+echo Format complete! Device is clean. >> "%LOG_FILE%"
+timeout /t 1 >nul
+
+:: ------------------------
+:: FLASHING PROCESS START
+:: ------------------------
+cls
+echo =============================================
+echo   FLASHING STOCK FASTBOOT ROM  
+echo =============================================
+echo Flashing Stock Fastboot ROM... >> "%LOG_FILE%"
+
+:: Flashing Boot Partitions (A & B)
+echo Flashing Boot Partitions...
+echo Flashing Boot Partitions... >> "%LOG_FILE%"
+for %%p in (boot dtbo init_boot vendor_boot vbmeta vbmeta_system vbmeta_vendor) do (
+    echo Flashing %%p_a...
+    echo Flashing %%p_a... >> "%LOG_FILE%"
+    %fastboot% flash %%p_a %%p_a.img >> "%LOG_FILE%" 2>&1
+    echo Flashing %%p_b...
+    echo Flashing %%p_b... >> "%LOG_FILE%"
+    %fastboot% flash %%p_b %%p_b.img >> "%LOG_FILE%" 2>&1
+)
+echo Boot partitions flashed!
+echo Boot partitions flashed! >> "%LOG_FILE%"
+timeout /t 1 >nul
+
+:: Flashing Firmware (A & B)
+echo Flashing Firmware...
+echo Flashing Firmware... >> "%LOG_FILE%"
+for %%p in (apusys audio_dsp ccu connsys_bt connsys_gnss connsys_wifi dpm gpueb gz lk logo mcupm mcf_ota md1img mvpu_algo pi_img scp spmfw sspm tee vcp) do (
+    echo Flashing %%p_a...
+    echo Flashing %%p_a... >> "%LOG_FILE%"
+    %fastboot% flash %%p_a %%p_a.img >> "%LOG_FILE%" 2>&1
+    echo Flashing %%p_b...
+    echo Flashing %%p_b... >> "%LOG_FILE%"
+    %fastboot% flash %%p_b %%p_b.img >> "%LOG_FILE%" 2>&1
+)
+echo Firmware flashed!
+echo Firmware flashed! >> "%LOG_FILE%"
+timeout /t 1 >nul
+
+:: Flashing Logical Partitions
+echo Flashing Super Partition...
+echo Flashing Super Partition... >> "%LOG_FILE%"
+%fastboot% flash super super.img >> "%LOG_FILE%" 2>&1
+echo Super partition flashed!
+echo Super partition flashed! >> "%LOG_FILE%"
+timeout /t 1 >nul
+
+:: ------------------------
+:: FINALIZATION
+:: ------------------------
+echo Setting Active Slot B...
+%fastboot% --set-active=b >> "%LOG_FILE%" 2>&1
+echo Slot B set as active!
+
+echo Rebooting Device...
+%fastboot% reboot >> "%LOG_FILE%" 2>&1
+echo Rebooting to System!
+pause
+exit
