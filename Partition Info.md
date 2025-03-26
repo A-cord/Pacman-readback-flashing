@@ -34,6 +34,9 @@
 - tee  
 - vcp  
 
+## Logical Partition
+super
+
 ---
 
 # Other Important Partitions  
