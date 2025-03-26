@@ -112,3 +112,6 @@
 ## Device Data
 - userdata
 - metadata
+
+## not available in readback
+- preloader_raw
