@@ -35,7 +35,7 @@
 - vcp  
 
 ## Logical Partition
-- super
+super
 ├── odm
 ├── odm_dlkm
 ├── product
