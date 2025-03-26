@@ -9,6 +9,24 @@ set LOG_FILE=%CD%\flash_log.txt
 echo ====== Flashing Log Started at %DATE% %TIME% ====== > "%LOG_FILE%"
 
 :: -----------------------------
+:: CHECK & DOWNLOAD PLATFORM-TOOLS
+:: -----------------------------
+if not exist "platform-tools\fastboot.exe" (
+    echo [INFO] Platform tools not found. Downloading...
+    curl -o platform-tools.zip https://dl.google.com/android/repository/platform-tools-latest-windows.zip
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to download platform-tools!
+        pause
+        exit /b 1
+    )
+    echo [INFO] Extracting platform-tools...
+    powershell -Command "Expand-Archive -Path 'platform-tools.zip' -DestinationPath '.' -Force"
+    del platform-tools.zip
+)
+
+set PATH=%CD%\platform-tools;%PATH%
+
+:: -----------------------------
 :: ASCII HEADER
 :: -----------------------------
 echo =====================================================
